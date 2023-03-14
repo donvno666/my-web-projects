@@ -40,7 +40,6 @@ typedValueElement.addEventListener('input', ()=>{
   if (typedValue === currentWord && wordIndex === words.length-1) {
     const elapsedTime = new Date().getTime()-startTime;
     const message = `CONGRATULATIONS! You finished in ${elapsedTime / 1000} seconds.`;
-    typedValueElement.className = '';
     messageElement.innerText = message;
     typedValueElement.disabled = true;
   } else if (typedValue.endsWith(' ') && typedValue.trim() === currentWord) {
@@ -52,7 +51,7 @@ typedValueElement.addEventListener('input', ()=>{
     }
     quoteElement.childNodes[wordIndex].className = 'highlight';
   } else if (currentWord.startsWith(typedValue)) {
-    typedValueElement.class = '';
+    typedValueElement.className = '';
   } else {
     typedValueElement.className = 'error';
   }
