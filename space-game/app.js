@@ -1,3 +1,4 @@
+// EventEmitter类用以发布和订阅消息
 class EventEmitter {
 	constructor() {
 		this.listeners = {};
@@ -17,6 +18,7 @@ class EventEmitter {
 	}
 }
 
+// hero和enemy都是从gameObject中延伸出来的
 class GameObject {
   constructor(x, y) {
     this.x = x;
@@ -67,6 +69,7 @@ function loadTexture(path) {
   })
 }
 
+// 建立常数
 const Messages = {
   KEY_EVENT_UP: "KEY_EVENT_UP",
   KEY_EVENT_DOWN: "KEY_EVENT_DOWN",
@@ -74,6 +77,7 @@ const Messages = {
   KEY_EVENT_RIGHT: "KEY_EVENT_RIGHT",
 };
 
+// 设定EventEmitter
 let heroImg, 
     enemyImg, 
     laserImg,
@@ -83,22 +87,24 @@ let heroImg,
     eventEmitter = new EventEmitter();
 
 let onKeyDown = function (e) {
-	console.log(e.keyCode);
+	console.log(e.keyCode); // 控制台记录键盘按键信息
 	switch (e.keyCode) {
-		case 37:
-		case 39:
-		case 38:
-		case 40: // Arrow keys
-		case 32:
+		case 37: // ArrowLeft
+		case 39: // ArrowRight
+		case 38: // ArrowUp
+		case 40: // ArrowDown
+		case 32: // Space
 			e.preventDefault();
-			break; // Space
+			break; 
 		default:
 			break; // do not block other keys
 	}
 };
 
+// 加入键盘事件处理器以处理键盘输入，hero的上下左右移动，按下的时候记录
 window.addEventListener('keydown', onKeyDown);
 
+// 键盘放开时执行上下移动的操作
 window.addEventListener('keyup', (evt) => {
   if (evt.key === 'ArrowUp') {
     eventEmitter.emit(Messages.KEY_EVENT_UP);
@@ -136,6 +142,7 @@ function drawGameObjects(ctx) {
   gameObjects.forEach((go) => go.draw(ctx));
 }
 
+// 初始化游戏
 function initGame() {
 	gameObjects = [];
 	createEnemies();
@@ -158,6 +165,7 @@ function initGame() {
 	});
 }
 
+// 设定游戏循环
 window.onload = async () => {
   canvas = document.getElementById('canvas')
   ctx = canvas.getContext('2d')
@@ -166,6 +174,7 @@ window.onload = async () => {
   laserImg = await loadTexture('assets/laserRed.png');
 
   initGame();
+  // 设定循环的间隔，即游戏画面的刷新时间
   let gameLoopId = setInterval(() => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = 'black';
