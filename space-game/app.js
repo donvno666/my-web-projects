@@ -53,6 +53,8 @@ class Hero extends GameObject {
     this.type = 'Hero';
     this.speed = {x:0, y:0};
     this.cooldown = 0;
+    this.life = 3;
+    this.points = 0;
   }
 
   fire() {
@@ -70,6 +72,17 @@ class Hero extends GameObject {
 
   canFire() {
     return this.cooldown === 0;
+  }
+
+  decrementLife() {
+    this.life--;
+    if (this.life === 0) {
+      this.dead = true;
+    }
+  }
+
+  incrementPoints() {
+    this.points += 100;
   }
 }
 
@@ -132,6 +145,7 @@ const Messages = {
 let heroImg, 
     enemyImg, 
     laserImg,
+    lifeImg,
     canvas, ctx, 
     gameObjects = [], 
     hero, 
@@ -227,7 +241,20 @@ function initGame() {
   eventEmitter.on(Messages.COLLISION_ENEMY_LASER, (_, { first, second }) => {
     first.dead = true;
     second.dead = true;
-  })
+  });
+
+  // 击落敌人时计分
+  eventEmitter.on(Messages.COLLISION_ENEMY_LASER, (_, { first, second}) => {
+    first.dead = true;
+    second.dead = true;
+    hero.incrementPoints();
+  });
+
+  // 我方与敌方相撞时扣血
+  eventEmitter.on(Messages.COLLISION_ENEMY_HERO, (_, { enemy }) => {
+    enemy.dead = true;
+    hero.decrementLife();
+  });
 }
 
 // 设定游戏循环
@@ -237,14 +264,17 @@ window.onload = async () => {
   heroImg = await loadTexture('assets/hero.png');
   enemyImg = await loadTexture('assets/enemyShip.png');
   laserImg = await loadTexture('assets/laserRed.png');
+  lifeImg = await loadTexture('assets/life.png');
 
   initGame();
   // 设定循环的间隔，即游戏画面的刷新时间
   let gameLoopId = setInterval(() => {
-    updateGameObjects();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    updateGameObjects();
+    drawPoints();
+    drawLife();
     drawGameObjects(ctx);
   }, 100)
 }
@@ -281,5 +311,40 @@ function updateGameObjects() {
     });
   });
 
+  // hero与enemy碰撞
+  enemies.forEach(enemy => {
+    const heroRect = hero.rectFromGameObject();
+    if (intersectRect(heroRect, enemy.rectFromGameObject())) {
+      eventEmitter.emit(Messages.COLLISION_ENEMY_HERO, { enemy });
+    }
+  })
+
+  // 用filter过滤掉dead属性为true的gameobject
   gameObjects = gameObjects.filter(go => !go.dead);
 }
+
+// 在画面上绘制文字，在canvas物件上使用方法fillText()
+
+function drawLife() {
+  const START_POS = canvas.width - 180;
+  for (let i=0; i < hero.life; i++) {
+    ctx.drawImage(
+      lifeImg,
+      START_POS + (45 * (i + 1)),
+      canvas.height -37
+    )
+  }
+}
+
+function drawPoints() {
+  ctx.font = '30px Arial';
+  ctx.fillStyle = 'red';
+  ctx.textAlign = 'left';
+  drawText('Points: ' + hero.points, 10, canvas.height - 20);
+}
+
+function drawText(message, x, y) {
+  ctx.fillText(message, x, y);
+}
+
+// 存在一个问题，当我方生命耗尽后，尸体依然可以移动、发射、撞毁敌机
