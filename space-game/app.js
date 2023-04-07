@@ -2,6 +2,8 @@
 // on 方法接受两个参数：一个消息字符串和一个监听器函数。它检查是否存在指定消息的任何现有监听器，并在不存在时创建一个空数组。然后将监听器函数添加到此数组中。
 // emit 方法接受一个消息字符串和一个可选的有效负载参数。它检查是否存在指定消息的任何侦听器，如果存在，则迭代每个侦听器函数并使用消息和有效载荷参数调用它。
 // 使用此 EventEmitter 类，您可以创建实例并使用它们触发事件，从而允许应用程序的不同部分彼此通信而不被紧密耦合。例如，您可能有一个模块监听用户输入事件，另一个模块通过更新 UI 响应这些事件。
+let gameLoopId;
+
 class EventEmitter {
 	constructor() {
 		this.listeners = {};
@@ -19,6 +21,10 @@ class EventEmitter {
 			this.listeners[message].forEach((l) => l(message, payload));
 		}
 	}
+
+  clear() {
+    this.listeners = {};
+  }
 }
 
 // hero和enemy都是从gameObject中延伸出来的
@@ -137,8 +143,11 @@ const Messages = {
   KEY_EVENT_LEFT: "KEY_EVENT_LEFT",
   KEY_EVENT_RIGHT: "KEY_EVENT_RIGHT",
   KEY_EVENT_SPACE: "KEY_EVENT_SPACE",
+  KEY_EVENT_ENTER: "KEY_EVENT_ENTER",
   COLLISION_ENEMY_LASER: "COLLISION_ENEMY_LASER",
   COLLISION_ENEMY_HERO: "COLLISION_ENEMY_HERO",
+  GAME_END_LOSS: "GAME_END_LOSS",
+  GAME_END_WIN: "GAME_END_WIN",
 };
 
 // 设定EventEmitter
@@ -181,6 +190,8 @@ window.addEventListener('keyup', (evt) => {
     eventEmitter.emit(Messages.KEY_EVENT_RIGHT);
   } else if (evt.keyCode === 32) {
     eventEmitter.emit(Messages.KEY_EVENT_SPACE);
+  } else if (evt.key === 'Enter') {
+    eventEmitter.emit(Messages.KEY_EVENT_ENTER);
   }
 })
 
@@ -248,17 +259,43 @@ function initGame() {
     first.dead = true;
     second.dead = true;
     hero.incrementPoints();
+
+    if (isEnemiesDead()) {
+      eventEmitter.emit(Messages.GAME_END_WIN); // 敌全灭，获胜
+    }
   });
 
   // 我方与敌方相撞时扣血
   eventEmitter.on(Messages.COLLISION_ENEMY_HERO, (_, { enemy }) => {
     enemy.dead = true;
     hero.decrementLife();
+    if (isHeroDead()) {
+      eventEmitter.emit(Messages.GAME_END_LOSS);
+      return; // 游戏失败，提前结束
+    }
+    if (isEnemiesDead()) {
+      eventEmitter.emit(Messages.GAME_END_WIN); // 相撞敌全灭也算胜利
+    }
+  });
+
+  // 接受处理游戏胜利或者失败的消息
+  eventEmitter.on(Messages.GAME_END_WIN, () => {
+    endGame(true);
+  })
+
+  eventEmitter.on(Messages.GAME_END_LOSS, () => {
+    endGame(false);
+  })
+
+  // 重新设定游戏
+  eventEmitter.on(Messages.KEY_EVENT_ENTER, () => {
+    resetGame();
   });
 }
 
 // 设定游戏循环
 window.onload = async () => {
+  // 加载贴图
   canvas = document.getElementById('canvas')
   ctx = canvas.getContext('2d')
   heroImg = await loadTexture('assets/hero.png');
@@ -268,7 +305,7 @@ window.onload = async () => {
 
   initGame();
   // 设定循环的间隔，即游戏画面的刷新时间
-  let gameLoopId = setInterval(() => {
+  gameLoopId = setInterval(() => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -348,3 +385,61 @@ function drawText(message, x, y) {
 }
 
 // 存在一个问题，当我方生命耗尽后，尸体依然可以移动、发射、撞毁敌机
+// 所以需要设定一个游戏结束状态：完成关卡或者说我方被击毁
+
+function isHeroDead() {
+  return hero.life <= 0;
+}
+
+function isEnemiesDead() {
+  // type为'Enemy'且未死亡
+  const enemies = gameObjects.filter((go) => go.type === 'Enemy' && !go.dead);
+  return enemies.length === 0;
+}
+
+// 制定游戏规则，当敌全灭时，显示胜利消息
+function displayMessage(message, color = 'red') {
+  ctx.font = '30px Arial';
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.fillText(message, canvas.width/2, canvas.height/2);
+}
+
+function endGame(win) {
+  clearInterval(gameLoopId);
+
+  // 设定延迟确保图像绘制完成
+  setTimeout(() => {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    if (win) {
+      displayMessage(
+        "Victory!\nPress [Enter] to start a new game",
+        'green'
+      );
+    } else {
+      displayMessage(
+        "You died!\nPress [Enter] to start a new game"
+      );
+    }
+  }, 200)
+}
+
+// 重新开始游戏
+function resetGame() {
+  if (gameLoopId) {
+    clearInterval(gameLoopId);
+    eventEmitter.clear();
+    initGame();
+    gameLoopId = setInterval(() => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      drawPoints();
+      drawLife();
+      updateGameObjects();
+      drawGameObjects(ctx);
+    }, 100)
+  }
+}
